@@ -6,6 +6,8 @@ from gym import spaces
 
 
 class EliminationEnv(gym.Env):
+    """游戏环境，维护状态，提供状态转移函数
+    """
     metadata = {"render_modes": ["local", "logic", "ai"]}
 
     def __init__(
@@ -17,6 +19,16 @@ class EliminationEnv(gym.Env):
         player=0,
         compete=True,
     ):
+        """创建新环境
+
+        Args:
+            render_mode (str, optional): 决定render的输出，可为 "logic" "local" "ai".  Defaults to None.
+            size (int, optional): 棋盘的边长. Defaults to 20.
+            categories (int, optional): 块的种类数. Defaults to 5.
+            max_round (int, optional): 最大回合数. Defaults to 100.
+            player (int, optional): 玩家序号. Defaults to 0.
+            compete (bool, optional): 是否为双人对战. Defaults to True.
+        """
         assert size >= 3
         self.size = size
         self.categories = categories
@@ -27,7 +39,8 @@ class EliminationEnv(gym.Env):
         self._max_round = max_round
         self._board = None
         self._score = [0, 0]
-        self._player = player
+        self._player = 0
+        self._seat = player
         self._compete = compete
 
         self.observation_space = spaces.MultiDiscrete(
@@ -40,6 +53,11 @@ class EliminationEnv(gym.Env):
         self.render_mode = render_mode
 
     def render(self):
+        """_summary_
+
+        Returns:
+            None|dict: 根据给定的参数进行局面渲染
+        """
         if self.render_mode == "local":
             for i in range(self.size):
                 print("")
@@ -85,10 +103,17 @@ class EliminationEnv(gym.Env):
 
         return eliminated_position
 
-    def _get_info(self):
-        return {"score": self._score}
 
     def reset(self, seed=None, board=None):
+        """_summary_
+
+        Args:
+            seed (int, optional): 环境随机数生成器的随机种子。和操作共同完全决定局面的转移. Defaults to None.
+            board (numpy.ndarray, optional): 初始棋盘。一般不使用. Defaults to None.
+
+        Returns:
+            numpy.ndarray: 返回初始化后的棋盘
+        """
         super().reset(seed=seed)
 
         self._round = 0
@@ -132,9 +157,18 @@ class EliminationEnv(gym.Env):
                     self._last_new[0].append([i, j, int(self._board[i][j])])
             self._last_elimination = [[[]]]
 
-        return self._board, self._get_info()
+        return self._board
 
     def step(self, action, player=0):
+        """_summary_
+
+        Args:
+            action (int): 操作的序号。可以由coord_to_num方法从坐标转换得到。
+            player (int, optional): 进行操作的玩家序号. Defaults to 0.
+
+        Returns:
+            tuple[np.ndarray, int, bool]: 分别为局面、当次操作的reward以及游戏是否结束
+        """
         self._last_elimination = []
         self._last_new = []
         self._player = player
