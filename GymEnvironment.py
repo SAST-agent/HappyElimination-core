@@ -235,6 +235,9 @@ class EliminationEnv(gym.Env):
     def action_space(self):
         return self.action_space
 
+    def observe(self):
+        return self._board
+
     def num_to_coord(self, action):
         assert action >= 0 and action <= self.size**4
         d = action % 20
