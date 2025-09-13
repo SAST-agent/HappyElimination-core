@@ -4,6 +4,7 @@ import gym
 import numpy as np
 from gym import spaces
 
+from gamedata import *
 
 class EliminationEnv(gym.Env):
     """游戏环境，维护状态，提供状态转移函数
@@ -42,6 +43,8 @@ class EliminationEnv(gym.Env):
         self._player = 0
         self._seat = player
         self._compete = compete
+        self._skill = 0
+        self._skill_last_round = 0
 
         self.observation_space = spaces.MultiDiscrete(
             np.ones((size, size)) * categories
@@ -78,6 +81,8 @@ class EliminationEnv(gym.Env):
                 "steps": self._max_round - self._round + 1,
                 "player": self._player,
                 "operation": self._last_operation,
+                "skill": self._skill,
+                "skillLastRound": self._skill_last_round,
                 "score": self._score,
                 "ManyTimesEliminateBlocks": self._last_elimination,
                 "ManyTimesNewBlocks": self._last_new,
@@ -102,7 +107,11 @@ class EliminationEnv(gym.Env):
                     eliminated_position.add((i - 2) * board.shape[1] + j)
 
         return eliminated_position
-
+    
+    def acquire_skill(self, skill):
+        self._skill = skill
+        self._score[self._player] -= SKILL_COST
+        self._skill_last_round = MAX_ROUND - 1
 
     def reset(self, seed=None, board=None):
         """_summary_
@@ -120,6 +129,8 @@ class EliminationEnv(gym.Env):
         self._last_new = [[]]
         self._last_elimination = [[]]
         self._last_operation = [[-1, -1], [-1, -1]]
+        self._skill = 0
+        self._skill_last_round = 0
         self._score = [0, 0]
         self._player = 0
 
@@ -159,7 +170,7 @@ class EliminationEnv(gym.Env):
 
         return self._board
 
-    def step(self, action, player=0):
+    def step(self, action, skill, player=0):
         """_summary_
 
         Args:
@@ -173,16 +184,31 @@ class EliminationEnv(gym.Env):
         self._last_new = []
         self._player = player
 
+        if skill != 0:
+            self.acquire_skill(skill)
+
         d = action % 20
         c = int(((action - d) / 20) % 20)
         b = int(((action - c * 20 - d) / 400) % 20)
         a = int(((action - d - c * 20 - b * 400) / 8000) % 20)
-
-        self._last_operation = [[a, b], [c, d]]
-        self._board[a][b], self._board[c][d] = self._board[c][d], self._board[a][b]
+        
+        if self._skill == 1:
+            eliminated_set = set()
+            eliminated_set.add(a * self.size + b)
+            eliminated_set.add(c * self.size + d)
+        else:
+            if self._skill == 2:
+                self._last_operation = [[a, b], [c, d]]
+                self._board[a][b], self._board[c][d] = self._board[c][d], self._board[a][b]
+            elif ( a == c and ( b == d-1 or b == d+1 ) ) or ( b == d and ( a == c-1 or a == c+1 ) ):
+                self._last_operation = [[a, b], [c, d]]
+                self._board[a][b], self._board[c][d] = self._board[c][d], self._board[a][b]
+            else:
+                raise ValueError("Invalid Action: Blocks to be swapped must be adjacent.")
+            eliminated_set = self._eliminate_step(self._board)
 
         reward = 0
-        while eliminated_set := self._eliminate_step(self._board):
+        while eliminated_set:
 
             eliminated_map = np.zeros((20, 20), dtype=np.int32)
             # print(eliminated_set)
@@ -218,6 +244,7 @@ class EliminationEnv(gym.Env):
             self._last_new.append(new)
 
             self._board = new_board
+            eliminated_set = self._eliminate_step(self._board)
 
         self._score[player] += reward
 
@@ -226,7 +253,9 @@ class EliminationEnv(gym.Env):
                 self._round += 1
         else:
             self._round += 1
-
+        
+        if self._skill_last_round > 0:
+            self._skill_last_round -= 1
         return (self._board, reward, self._round == self._max_round)
 
     def observation_space(self):
