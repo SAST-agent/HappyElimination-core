@@ -43,8 +43,8 @@ class EliminationEnv(gym.Env):
         self._player = 0
         self._seat = player
         self._compete = compete
-        self._skill = 0
-        self._skill_last_round = 0
+        self._skill = [0,0]
+        self._skill_last_round = [0,0]
 
         self.observation_space = spaces.MultiDiscrete(
             np.ones((size, size)) * categories
@@ -109,9 +109,9 @@ class EliminationEnv(gym.Env):
         return eliminated_position
     
     def acquire_skill(self, skill):
-        self._skill = skill
+        self._skill[self._player] = skill
         self._score[self._player] -= SKILL_COST
-        self._skill_last_round = MAX_ROUND - 1
+        self._skill_last_round[self._player] = MAX_ROUND - 1
 
     def reset(self, seed=None, board=None):
         """_summary_
@@ -129,8 +129,8 @@ class EliminationEnv(gym.Env):
         self._last_new = [[]]
         self._last_elimination = [[]]
         self._last_operation = [[-1, -1], [-1, -1]]
-        self._skill = 0
-        self._skill_last_round = 0
+        self._skill = [0,0]
+        self._skill_last_round = [0,0]
         self._score = [0, 0]
         self._player = 0
 
@@ -192,12 +192,12 @@ class EliminationEnv(gym.Env):
         b = int(((action - c * 20 - d) / 400) % 20)
         a = int(((action - d - c * 20 - b * 400) / 8000) % 20)
         
-        if self._skill == 1:
+        if self._skil[self._player] == 1:
             eliminated_set = set()
             eliminated_set.add(a * self.size + b)
             eliminated_set.add(c * self.size + d)
         else:
-            if self._skill == 2:
+            if self._skill[self._player] == 2:
                 self._last_operation = [[a, b], [c, d]]
                 self._board[a][b], self._board[c][d] = self._board[c][d], self._board[a][b]
             elif ( a == c and ( b == d-1 or b == d+1 ) ) or ( b == d and ( a == c-1 or a == c+1 ) ):
@@ -254,8 +254,8 @@ class EliminationEnv(gym.Env):
         else:
             self._round += 1
         
-        if self._skill_last_round > 0:
-            self._skill_last_round -= 1
+        if self._skill_last_round[self._player] > 0:
+            self._skill_last_round[self._player] -= 1
         return (self._board, reward, self._round == self._max_round)
 
     def observation_space(self):
